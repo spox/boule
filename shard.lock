@@ -1,0 +1,30 @@
+version: 1.0
+shards:
+  crogo:
+    github: spox/crogo
+    commit: 33a3421a5ee75960ac81e1c57e88795c5fb33b81
+
+  kemal:
+    github: sdogruyol/kemal
+    version: 0.16.1
+
+  kilt:
+    github: jeromegn/kilt
+    version: 0.3.3
+
+  multipart:
+    github: RX14/multipart.cr
+    version: 0.1.0
+
+  radix:
+    github: luislavena/radix
+    version: 0.3.1
+
+  spec-kemal:
+    github: sdogruyol/spec-kemal
+    version: 0.3.1
+
+  spec2:
+    github: waterlink/spec2.cr
+    commit: eef5144d86f3aadf95811ffc0450be389db36fed
+
