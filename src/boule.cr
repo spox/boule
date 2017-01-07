@@ -36,13 +36,12 @@ module Boule
     end
     configure_logger(cli, logger_conf)
     info "Configuration loading and logger setup complete."
-    info "Initializing terraform interface."
-    @@terraform = Terraform.new(configuration)
     info "Starting REST API interface."
     # Set test env to allow manual control
     start_env = Kemal.config.env
     Kemal.config.env = "test"
-    Kemal.config.logger = Rest::Api.new
+    Kemal.config.logger = Boule::Rest::Api.new
+    Kemal.config.clear
     Kemal.run
     Kemal.config.env = start_env
     info "REST API interface now active -> " \
@@ -51,23 +50,12 @@ module Boule
   end
 
   def self.stop!
-    info "Clearing terraform interface."
-    terraform.halt!
-    @@terraform = nil
+    info "Cleaning up terraform interface."
+    Boule::Terraform::Stack.cleanup_actions!
     @@running = false
     info "Shutting down REST API interface."
     Kemal.config.server.close
     info "System halted."
-  end
-
-  def self.terraform : Terraform
-    terraform = @@terraform
-    if(terraform)
-      terraform
-    else
-      error "Terraform instance instance is not currently instantiated!"
-      raise Error::System::NotReady.new("Terraform instance is not yet ready.")
-    end
   end
 
   # @return [Configuration]
