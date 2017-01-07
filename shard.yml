@@ -4,7 +4,7 @@ version: 0.1.0
 dependencies:
   kemal:
     github: sdogruyol/kemal
-    version: ~> 0.16.1
+    version: ~> 0.17.4
   crogo:
     github: spox/crogo
     branch: master
