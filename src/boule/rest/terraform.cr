@@ -15,9 +15,27 @@ module Boule
         end
       end
 
+      def self.tf_stack(name : String)
+        Boule::Terraform::Stack.new(
+          container: Boule.configuration.get("terraform", "directory", type: :string).to_s,
+          scrub_destroyed: !!Boule.configuration.get("terraform", "scrub_destroyed", type: :bool),
+          name: name
+        )
+      end
+
+      def self.tf_stack(name : String)
+        yield(tf_stack(name))
+      end
+
       # Get list of stacks
       get "/terraform/stacks" do |env|
-        result = Boule.terraform.stacks
+        stack_names = Boule::Terraform::Stack.list(
+          Boule.configuration.get("terraform", "directory", type: :string).to_s
+        )
+        result = stack_names.map do |stack_name|
+          debug "Getting info for stack: #{stack_name}"
+          tf_stack(stack_name).info
+        end
         debug "Generated stack listing: #{result}"
         {"stacks" => result}.to_json
       end
@@ -26,7 +44,7 @@ module Boule
       get "/terraform/stack/:name" do |env|
         begin
           stack_name = env.params.url["name"]
-          result = Boule.terraform.info(stack_name)
+          result = tf_stack(stack_name).info
           debug "Stack information for `#{stack_name}` - #{result}"
           {"stack" => result}.to_json
         rescue Error::Terraform::UnknownStack
@@ -38,7 +56,7 @@ module Boule
       # expects: :template, :parameters
       post "/terraform/stack/:name" do |env|
         stack_name = env.params.url["name"]
-        if(Boule.terraform.exists?(stack_name))
+        if(tf_stack(stack_name).exists?)
           error_result(405, "stack already exists")
         else
           if(env.params.json["template"]?)
@@ -48,12 +66,11 @@ module Boule
             else
               parameters = {} of String => JSON::Type
             end
-            result = Boule.terraform.apply(stack_name, template, parameters)
-            output = {} of String => JSON::Type
-            output["id"] = result.id
-            output["active"] = result.active
-            output["started"] = result.started.epoch_ms
-            {"stack" => output}.to_json
+            result = tf_stack(stack_name) do |stack|
+              stack.save(template, parameters)
+              stack.info
+            end
+            {"stack" => result}.to_json
           else
             error_result(412, "template is required")
           end
@@ -63,7 +80,7 @@ module Boule
       # Update stack
       put "/terraform/stack/:name" do |env|
         stack_name = env.params.url["name"]
-        unless(Boule.terraform.exists?(stack_name))
+        unless(tf_stack(stack_name).exists?)
           error_result(405, "stack does not exist")
         else
           if(env.params.json["template"]?)
@@ -73,12 +90,11 @@ module Boule
             else
               parameters = {} of String => JSON::Type
             end
-            result = Boule.terraform.apply(stack_name, template, parameters)
-            output = {} of String => JSON::Type
-            output["id"] = result.id
-            output["active"] = result.active
-            output["started"] = result.started.epoch_ms
-            {"stack" => output}.to_json
+            result = tf_stack(stack_name) do |stack|
+              stack.save(template, parameters)
+              stack.info
+            end
+            {"stack" => result}.to_json
           else
             error_result(412, "template is required")
           end
@@ -88,37 +104,35 @@ module Boule
       # Delete stack
       delete "/terraform/stack/:name" do |env|
         stack_name = env.params.url["name"]
-        unless(Boule.terraform.exists?(stack_name))
-          error_result(405, "stack does not exist")
+        unless(tf_stack(stack_name).exists?)
+          error_result(404, "stack does not exist")
         else
-          result = Boule.terraform.destroy(stack_name)
-          output = {} of String => JSON::Type
-          output["id"] = result.id
-          output["active"] = result.active
-          output["started"] = result.started.epoch_ms
-          output.to_json
+          result = tf_stack(stack_name) do |stack|
+            stack.destroy!
+            stack.info
+          end
+          {"stack" => result}.to_json
         end
       end
 
       # Get events for stack
       get "/terraform/events/:name" do |env|
         stack_name = env.params.url["name"]
-        unless(Boule.terraform.exists?(stack_name))
+        unless(tf_stack(stack_name).exists?)
           error_result(405, "stack does not exist")
         else
-          result = Boule.terraform.events(stack_name)
-          {"events" => result}.to_json
+          {"events" => tf_stack(stack_name).events}.to_json
         end
       end
 
       # Get resources for stack
       get "/terraform/resources/:name" do |env|
         stack_name = env.params.url["name"]
-        unless(Boule.terraform.exists?(stack_name))
+        unless(tf_stack(stack_name).exists?)
           error_result(404, "unknown stack")
         else
           debug "Fetching resources for `#{stack_name}`"
-          result = Boule.terraform.resources(stack_name)
+          result = tf_stack(stack_name).resources
           debug "Stack resources for `#{stack_name}` - #{result}"
           {"resources" => result}.to_json
         end
@@ -127,11 +141,11 @@ module Boule
       # Get template for stack
       get "/terraform/template/:name" do |env|
         stack_name = env.params.url["name"]
-        unless(Boule.terraform.exists?(stack_name))
+        unless(tf_stack(stack_name).exists?)
           error_result(404, "unknown stack")
         else
           debug "Fetching template for `#{stack_name}`"
-          result = Boule.terraform.template(stack_name)
+          result = tf_stack(stack_name).template
           {"template" => result}.to_json
         end
       end
@@ -143,7 +157,7 @@ module Boule
           unless(template.is_a?(String))
             template = template.to_json
           end
-          result = Boule.terraform.validate(template)
+          result = tf_stack(SecureRandom.uuid).validate(template)
           if(result.empty?)
             {"valid" => true}.to_json
           else
