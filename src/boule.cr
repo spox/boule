@@ -3,7 +3,7 @@ require "option_parser"
 require "logger"
 require "crogo"
 require "kemal"
-require "secure_random"
+require "uuid"
 require "file_utils"
 require "signal"
 require "./boule/utils"
@@ -39,14 +39,15 @@ module Boule
     info "Starting REST API interface."
     # Set test env to allow manual control
     start_env = Kemal.config.env
-    Kemal.config.env = "test"
+    Kemal.config.env = cli["debug"]? ? "test" : "production"
     Kemal.config.logger = Boule::Rest::Api.new
     Kemal.config.clear
     Kemal.run
     Kemal.config.env = start_env
     info "REST API interface now active -> " \
          "#{Kemal.config.scheme}://#{Kemal.config.host_binding}:#{Kemal.config.port}"
-    Kemal.config.server.listen
+    srv = Kemal.config.server
+    srv.listen if srv
   end
 
   def self.stop!
@@ -54,7 +55,8 @@ module Boule
     Boule::Terraform::Stack.cleanup_actions!
     @@running = false
     info "Shutting down REST API interface."
-    Kemal.config.server.close
+    srv = Kemal.config.server
+    srv.close if srv
     info "System halted."
   end
 
