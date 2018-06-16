@@ -7,7 +7,7 @@ module Boule
 
       record Status, id : String, type : Symbol, active : Bool, started : Time, exit_code : Int32?
 
-      property id = SecureRandom.uuid
+      property id = UUID.random.to_s.as(String)
       property type : Symbol
       property directory : String
       property raw_process : Process?

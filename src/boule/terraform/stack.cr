@@ -1,4 +1,5 @@
 require "file_utils"
+
 module Boule
   module Terraform
     class Stack
@@ -14,7 +15,7 @@ module Boule
 
         include Utils::Logger
 
-        property id = SecureRandom.uuid
+        property id = UUID.random.to_s.as(String)
         property command : String
         property options : Hash(Symbol, String)
         property waiter : Concurrent::Future(Process::Status)?
@@ -213,7 +214,7 @@ module Boule
           raise ArgumentError.new "Container directory must be set!"
         end
         if(File.directory?(container))
-          Dir.new(container).map do |entry|
+          Dir.children(container).map do |entry|
             next if entry.starts_with?(".")
             entry if File.directory?(File.join(container, entry))
           end.compact
@@ -534,7 +535,7 @@ module Boule
               "timestamp" => Time.now.epoch_ms,
               "resource_name" => resource_name,
               "resource_status" => resource_status,
-              "id" => SecureRandom.uuid
+              "id" => UUID.random.to_s
             } of String => JSON::Type
             update_info do |info|
               if(info["events"]?)

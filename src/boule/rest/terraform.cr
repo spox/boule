@@ -157,7 +157,7 @@ module Boule
           unless(template.is_a?(String))
             template = template.to_json
           end
-          result = tf_stack(SecureRandom.uuid).validate(template)
+          result = tf_stack(UUID.random.to_s).validate(template)
           if(result.empty?)
             {"valid" => true}.to_json
           else

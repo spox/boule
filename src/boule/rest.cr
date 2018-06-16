@@ -12,7 +12,7 @@ module Boule
 
       def call(context)
         time = Time.now
-        request_id = SecureRandom.uuid
+        request_id = UUID.random.to_s
         info "-> #{request_id} #{context.request.method} #{context.request.resource}"
         call_next(context)
         elapsed_text = elapsed_text(Time.now - time)
